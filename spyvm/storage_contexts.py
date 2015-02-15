@@ -4,7 +4,7 @@ from spyvm.storage import AbstractStrategy, ShadowMixin, AbstractGenericShadow
 from rpython.tool.pairtype import extendabletype
 from rpython.rlib import rarithmetic, jit, objectmodel
 from rpython.rlib.objectmodel import import_from_mixin
-import rstrategies as rstrat
+from rpython.rlib.rstrategies import rstrategies as rstrat
 
 @objectmodel.specialize.call_location()
 def fresh_virtualizable(x):

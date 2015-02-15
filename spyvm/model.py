@@ -22,7 +22,7 @@ from rpython.tool.pairtype import extendabletype
 from rpython.rlib.objectmodel import instantiate, compute_hash, import_from_mixin, we_are_translated
 from rpython.rtyper.lltypesystem import lltype, rffi
 from rsdl import RSDL, RSDL_helper
-import rstrategies as rstrat
+from rpython.rlib.rstrategies import rstrategies as rstrat
 
 class W_Object(object):
     """Root of Squeak model, abstract."""

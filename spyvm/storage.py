@@ -4,7 +4,7 @@ from spyvm import model, constants
 from spyvm.util.version import VersionMixin
 from rpython.rlib import objectmodel, jit
 from rpython.rlib.objectmodel import import_from_mixin
-import rstrategies as rstrat
+from rpython.rlib.rstrategies import rstrategies as rstrat
 
 """
 A note on terminology:

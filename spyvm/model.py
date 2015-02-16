@@ -12,7 +12,7 @@ Squeak model.
             W_CompiledMethod
 """
 import sys
-from spyvm import constants, error, util
+from spyvm import constants, error
 from spyvm.util import system
 from spyvm.util.version import constant_for_version, constant_for_version_arg, VersionMixin
 

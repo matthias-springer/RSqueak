@@ -2,7 +2,7 @@
 import sys, time, os
 
 from rpython.rlib import jit, rpath, objectmodel
-from spyvm import model, util, interpreter, squeakimage, objspace, wrapper, error
+from spyvm import model, interpreter, squeakimage, objspace, wrapper, error
 from spyvm.util import system
 
 def _usage(argv):

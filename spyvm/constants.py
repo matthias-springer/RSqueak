@@ -1,6 +1,7 @@
 import sys
 import time
 from rpython.rlib.jit import elidable
+from spyvm.util import system
 
 from spyvm.util.bitmanipulation import splitter
 
@@ -63,7 +64,6 @@ FORM_DEPTH = 3
 # Miscellaneous constants
 
 LITERAL_START = 1 # index of the first literal after the method header
-BYTES_PER_WORD = 4
 WORDS_IN_FLOAT = 2 # Fixed number of word-slots in a Squeak Float object
 
 # ___________________________________________________________________________
@@ -153,14 +153,21 @@ objects_in_special_object_table = {
     "runWithIn" : SO_RUN_WITH_IN,
 }
 
-from rpython.rlib.rarithmetic import LONG_BIT
-TAGGED_MAXINT = 2 ** (LONG_BIT - 2) - 1
-TAGGED_MININT = -2 ** (LONG_BIT - 2)
+# from rpython.rlib.rarithmetic import LONG_BIT
+# Even on 64bit systems, Smalltalk semantics demand 32 bit integers
+LONG_BIT = 32
+
+BYTES_PER_WORD = 4
+SYSTEM_BYTES_PER_WORD = 8 if system.IS_64BIT else 4
 
 TAGGED_MASK = int(2 ** (LONG_BIT - 1) - 1)
+MAX_UINT = (1<<31) - 1
+MAXINT = 2 ** (LONG_BIT - 2) - 1 # SmallIntegers are tagged
+MININT = -2 ** (LONG_BIT - 2)
 
-MAXINT = sys.maxint
-MININT = -sys.maxint-1
+SYSTEM_MAXINT = sys.maxint
+SYSTEM_MININT = -sys.maxint-1
+
 
 # Entries into SO_SPECIAL_SELECTORS_ARRAY:
 #(#+ 1 #- 1 #< 1 #> 1 #<= 1 #>= 1 #= 1 #~= 1 #* 1 #/ 1 #\\ 1 #@ 1 #bitShift: 1 #// 1 #bitAnd: 1 #bitOr: 1 #at: 1 #at:put: 2 #size 0 #next 0 #nextPut: 1 #atEnd 0 #== 1 #class 0 #blockCopy: 1 #value 0 #value: 1 #do: 1 #new 0 #new: 1 #x 0 #y 0)

@@ -215,6 +215,8 @@ class W_SmallInteger(W_Object):
 
     def __init__(self, value):
         self.value = intmask(value)
+        if not self.invariant():
+            import pdb; pdb.set_trace()
 
     def getclass(self, space):
         return space.w_SmallInteger
@@ -223,16 +225,16 @@ class W_SmallInteger(W_Object):
         return self.value
 
     def invariant(self):
-        return isinstance(self.value, int) and self.value < 0x8000
+        return isinstance(self.value, int) and self.value <= constants.MAXINT
 
     def lshift(self, space, shift):
-        from rpython.rlib.rarithmetic import ovfcheck, intmask
+        from rpython.rlib.rarithmetic import ovfcheck
         # shift > 0, therefore the highest bit of upperbound is not set,
         # i.e. upperbound is positive
         upperbound = intmask(r_uint(-1) >> shift)
         if 0 <= self.value <= upperbound:
             shifted = intmask(self.value << shift)
-            return space.wrap_positive_32bit_int(shifted)
+            return space.wrap_positive_int(shifted)
         else:
             try:
                 shifted = ovfcheck(self.value << shift)
@@ -282,7 +284,7 @@ class W_AbstractObjectWithIdentityHash(W_Object):
     repr_classname = "W_AbstractObjectWithIdentityHash"
 
     hash_generator = rrandom.Random()
-    UNASSIGNED_HASH = sys.maxint
+    UNASSIGNED_HASH = constants.MAXINT
     hash = UNASSIGNED_HASH # default value
 
     def fillin(self, space, g_self):
@@ -355,7 +357,7 @@ class W_LargePositiveInteger1Word(W_AbstractObjectWithIdentityHash):
         upperbound = intmask(r_uint(-1) >> shift)
         if 0 <= self.value <= upperbound:
             shifted = intmask(self.value << shift)
-            return space.wrap_positive_32bit_int(shifted)
+            return space.wrap_positive_int(shifted)
         else:
             raise error.PrimitiveFailedError()
 
@@ -933,7 +935,7 @@ class W_WordsObject(W_AbstractObjectWithClassReference):
                 not int_between(0, i_value ^ (0xffffffff), 0x8000)):
                 raise error.PrimitiveFailedError
         else:
-            if not int_between(-0x8000, i_value, 0x8000):
+            if not int_between(constants.MININT, i_value, constants.MAXINT):
                 raise error.PrimitiveFailedError
         word_index0 = index0 / 2
         word = intmask(r_uint32(self.getword(word_index0)))

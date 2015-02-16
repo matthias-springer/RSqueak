@@ -45,10 +45,10 @@ def test_ruint():
     => 27670116110564327424
     """
 
-    for num in [0, 1, 41, 100, 2**31, sys.maxint + 1, -1]:
+    for num in [0, 1, 41, 100, 2**31, constants.MAXINT + 1, -1]:
         num = r_uint(num)
         assert space.unwrap_uint(space.wrap_uint(num)) == num
-    for num in [-1, -100, -sys.maxint]:
+    for num in [-1, -100, -constants.MAXINT]:
         with py.test.raises(objspace.WrappingError):
             space.wrap_uint(num)
     # byteobj = space.wrap_uint(0x100000000)

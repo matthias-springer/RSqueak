@@ -4,7 +4,9 @@ import math
 import operator
 from spyvm import model, model_display, storage_contexts, error, constants, display, wrapper
 from spyvm.error import PrimitiveFailedError, PrimitiveNotYetWrittenError
+from spyvm.util import system
 from rpython.rlib import rarithmetic, rfloat, unroll, jit, objectmodel
+from rpython.rlib.rarithmetic import r_uint, r_uint32
 
 def assert_class(interp, w_obj, w_class):
     if not w_obj.getclass(interp.space).is_same_object(w_class):
@@ -125,7 +127,7 @@ def wrap_primitive(unwrap_spec=None, no_result=False,
                     if spec is int:
                         args += (interp.space.unwrap_int(w_arg), )
                     elif spec is pos_32bit_int:
-                        args += (interp.space.unwrap_positive_32bit_int(w_arg),)
+                        args += (interp.space.unwrap_positive_int(w_arg),)
                     elif spec is index1_0:
                         args += (interp.space.unwrap_int(w_arg)-1, )
                     elif spec is float:
@@ -210,7 +212,7 @@ for (code,op) in bitwise_binary_ops.items():
         @expose_primitive(code, unwrap_spec=[pos_32bit_int, pos_32bit_int])
         def func(interp, s_frame, receiver, argument):
             res = op(receiver, argument)
-            return interp.space.wrap_positive_32bit_int(rarithmetic.intmask(res))
+            return interp.space.wrap_positive_int(rarithmetic.intmask(res))
     make_func(op)
 
 # #/ -- return the result of a division, only succeed if the division is exact
@@ -1059,15 +1061,21 @@ def func(interp, s_frame, w_delay, w_semaphore, timestamp):
 
 
 
-secs_between_1901_and_1970 = rarithmetic.r_uint((69 * 365 + 17) * 24 * 3600)
+secs_between_1901_and_1970 = r_uint((69 * 365 + 17) * 24 * 3600)
 
 @expose_primitive(SECONDS_CLOCK, unwrap_spec=[object])
 def func(interp, s_frame, w_arg):
-    import time
-    sec_since_epoch = rarithmetic.r_uint(time.time())
-    # XXX: overflow check necessary?
-    sec_since_1901 = sec_since_epoch + secs_between_1901_and_1970
-    return interp.space.wrap_uint(rarithmetic.r_uint(sec_since_1901))
+    if system.IS_64BIT:
+        import time
+        sec_since_epoch = r_uint(time.time())
+        # XXX: overflow check necessary?
+        sec_since_1901 = sec_since_epoch + secs_between_1901_and_1970
+        return interp.space.wrap_uint(r_uint(sec_since_1901))
+    else:
+        # XXX Fix this primitive; the returned value is larger than 32 bit
+        # and only fits into a LargeInteger1Word on 64bit systems.
+        # On 32 bit systems, we need to return a real LargeInteger object.
+        return interp.space.wrap_uint(interp.time_now())
 
 
 #____________________________________________________________________________
@@ -1111,7 +1119,7 @@ def func(interp, s_frame, w_arg, new_value):
             w_arg.setchar(i, chr(new_value))
     elif isinstance(w_arg, model.W_WordsObject) or isinstance(w_arg, model_display.W_DisplayBitmap):
         for i in xrange(w_arg.size()):
-            w_arg.setword(i, rarithmetic.r_uint(new_value))
+            w_arg.setword(i, r_uint(new_value))
     else:
         raise PrimitiveFailedError
     return w_arg

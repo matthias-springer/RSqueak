@@ -150,23 +150,28 @@ class ObjSpace(object):
     def wrap_int(self, val):
         if not isinstance(val, int):
             raise WrappingError
-        return model.W_SmallInteger(val)
+        if int_between(constants.MININT, val, constants.MAXINT):
+            return model.W_SmallInteger(val)
+        elif int_between(0, val, constants.SYSTEM_MAXINT):
+            return model.W_LargePositiveInteger1Word(val)
+        else:
+            raise WrappingError("Cannot wrap_int: %h" % val)
 
     def wrap_uint(self, val):
-        from rpython.rlib.objectmodel import we_are_translated
         if val < 0:
             raise WrappingError("negative integer")
         else:
-            return self.wrap_positive_32bit_int(intmask(val))
+            return self.wrap_positive_int(val)
 
-    def wrap_positive_32bit_int(self, val):
+    def wrap_positive_int(self, val):
         # This will always return a positive value.
-        # XXX: For now, we assume that val is at most 32bit, i.e. overflows are
-        # checked for before wrapping. Also, we ignore tagging.
-        if int_between(0, val, constants.MAXINT):
+        uval = r_uint(val)
+        if val <= constants.MAXINT:
             return model.W_SmallInteger(val)
-        else:
+        elif val <= constants.SYSTEM_MAXINT:
             return model.W_LargePositiveInteger1Word(val)
+        else:
+            raise WrappingError("Cannot wrap positive int: %h" % val)
 
     def wrap_float(self, i):
         return model.W_Float(i)
@@ -218,7 +223,7 @@ class ObjSpace(object):
     def unwrap_uint(self, w_value):
         return w_value.unwrap_uint(self)
 
-    def unwrap_positive_32bit_int(self, w_value):
+    def unwrap_positive_int(self, w_value):
         if isinstance(w_value, model.W_SmallInteger):
             if w_value.value >= 0:
                 return r_uint(w_value.value)

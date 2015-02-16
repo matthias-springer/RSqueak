@@ -1,5 +1,5 @@
 import py, math, socket
-from spyvm import model, model_display, storage_classes, error, display
+from spyvm import model, model_display, storage_classes, error, display, constants
 from rpython.rlib.rarithmetic import intmask, r_uint
 from rpython.rtyper.lltypesystem import lltype, rffi
 from .util import create_space, copy_to_module, cleanup_module
@@ -339,9 +339,10 @@ def test_large_positive_integer_1word_at():
     assert b.value == -1
 
 def test_large_positive_integer_1word_at_put():
-    target = model.W_LargePositiveInteger1Word(0)
-    source = model.W_LargePositiveInteger1Word(-1)
-    for i in range(4):
+    size=constants.SYSTEM_BYTES_PER_WORD
+    target = model.W_LargePositiveInteger1Word(0, size=size)
+    source = model.W_LargePositiveInteger1Word(-1, size=size)
+    for i in range(size):
         target.atput0(space, i, source.at0(space, i))
         assert target.at0(space, i) == source.at0(space, i)
     assert hex(r_uint(target.value)) == hex(r_uint(source.value))

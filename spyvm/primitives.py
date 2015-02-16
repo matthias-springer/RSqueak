@@ -250,8 +250,7 @@ def func(interp, s_frame, receiver, argument):
 # #bitShift: -- return the shifted value
 @expose_primitive(BIT_SHIFT, unwrap_spec=[object, int])
 def func(interp, s_frame, receiver, argument):
-    from rpython.rlib.rarithmetic import LONG_BIT
-    if -LONG_BIT < argument < LONG_BIT:
+    if -constants.LONG_BIT < argument < constants.LONG_BIT:
         # overflow-checking done in lshift implementations
         if argument > 0:
             return receiver.lshift(interp.space, argument)
@@ -866,15 +865,6 @@ def func(interp, s_frame, w_arg, w_rcvr):
         raise PrimitiveFailedError()
 
     w_rcvr.w_class = w_arg_class
-
-
-if constants.LONG_BIT == 32:
-    def callIProxy(signature, interp, s_frame, argcount, s_method):
-        from spyvm.interpreter_proxy import IProxy
-        return IProxy.call(signature, interp, s_frame, argcount, s_method)
-else:
-    def callIProxy(signature, interp, s_frame, argcount, s_method):
-        raise PrimitiveFailedError
 
 @expose_primitive(EXTERNAL_CALL, clean_stack=False, no_result=True, compiled_method=True)
 def func(interp, s_frame, argcount, w_method):

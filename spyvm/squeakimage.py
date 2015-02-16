@@ -265,7 +265,7 @@ class SqueakImage(object):
         w_display = space.objtable["w_display"]
         if w_display is not None and not w_display.is_nil(space):
             depth = space.unwrap_int(w_display.fetch(space, 3))
-            if constants.LONG_BIT == 64 and depth < 32:
+            if system.IS_64BIT and depth < 32:
                 w_display.store(space, 3, space.wrap_int(32))
             elif depth < 8:
                 # non-native indexed color depth not well supported

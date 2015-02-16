@@ -12,7 +12,8 @@ Squeak model.
             W_CompiledMethod
 """
 import sys
-from spyvm import constants, error, system
+from spyvm import constants, error, util
+from spyvm.util import system
 from spyvm.util.version import constant_for_version, constant_for_version_arg, VersionMixin
 
 from rpython.rlib import rrandom, objectmodel, jit, signature
@@ -785,7 +786,7 @@ class W_BytesObject(W_AbstractObjectWithClassReference):
     def short_atput0(self, space, index0, w_value):
         from rpython.rlib.rarithmetic import int_between
         i_value = space.unwrap_int(w_value)
-        if constants.LONG_BIT == 64:
+        if system.IS_64BIT:
             if (not int_between(0, i_value, 0x8000) and
                 not int_between(0, i_value ^ (0xffffffff), 0x8000)):
                 raise error.PrimitiveFailedError
@@ -927,7 +928,7 @@ class W_WordsObject(W_AbstractObjectWithClassReference):
     def short_atput0(self, space, index0, w_value):
         from rpython.rlib.rarithmetic import int_between
         i_value = space.unwrap_int(w_value)
-        if constants.LONG_BIT == 64:
+        if system.IS_64BIT:
             if (not int_between(0, i_value, 0x8000) and
                 not int_between(0, i_value ^ (0xffffffff), 0x8000)):
                 raise error.PrimitiveFailedError

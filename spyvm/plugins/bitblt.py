@@ -1,6 +1,6 @@
-from spyvm import model
+from spyvm import model_display, model
 from spyvm.error import PrimitiveFailedError
-from spyvm.shadow import AbstractCachingShadow
+from spyvm.storage import AbstractCachingShadow
 from spyvm.plugins.plugin import Plugin
 
 from rpython.rlib import jit, objectmodel
@@ -32,13 +32,13 @@ def primitiveCopyBits(interp, s_frame, w_rcvr):
         s_frame.push(interp.space.wrap_int(s_bitblt.bitCount))
     elif w_dest_form.is_same_object(space.objtable['w_display']):
         w_bitmap = w_dest_form.fetch(space, 0)
-        assert isinstance(w_bitmap, model.W_DisplayBitmap)
+        assert isinstance(w_bitmap, model_display.W_DisplayBitmap)
         w_bitmap.flush_to_screen()
     return w_rcvr
 
 
 def intOrIfNil(space, w_int, i):
-    if w_int is space.w_nil:
+    if w_int.is_nil(space):
         return i
     elif isinstance(w_int, model.W_Float):
         return intmask(int(space.unwrap_float(w_int)))
@@ -47,14 +47,12 @@ def intOrIfNil(space, w_int, i):
 
 
 class BitBltShadow(AbstractCachingShadow):
+    repr_classname = "BitBltShadow"
     WordSize = 32
     MaskTable = [r_uint(0)]
     for i in xrange(WordSize):
         MaskTable.append(r_uint((2 ** (i + 1)) - 1))
     AllOnes = r_uint(0xFFFFFFFF)
-
-    def sync_cache(self):
-        pass
 
     def intOrIfNil(self, w_int, i):
         return intOrIfNil(self.space, w_int, i)
@@ -68,7 +66,7 @@ class BitBltShadow(AbstractCachingShadow):
         return s_form
 
     def loadHalftone(self, w_halftone_form):
-        if w_halftone_form is self.space.w_nil:
+        if w_halftone_form.is_nil(self.space):
             return None
         elif isinstance(w_halftone_form, model.W_WordsObject):
             # Already a bitmap
@@ -91,30 +89,30 @@ class BitBltShadow(AbstractCachingShadow):
 
     def loadBitBlt(self):
         self.success = True
-        self.w_destForm = self.fetch(0)
+        self.w_destForm = self.own_fetch(0)
         self.dest = self.loadForm(self.w_destForm)
-        self.w_sourceForm = self.fetch(1)
-        if self.w_sourceForm is not self.space.w_nil:
+        self.w_sourceForm = self.own_fetch(1)
+        if not self.w_sourceForm.is_nil(self.space):
             self.source = self.loadForm(self.w_sourceForm)
         else:
             self.source = None
-        self.halftone = self.loadHalftone(self.fetch(2))
-        self.combinationRule = self.space.unwrap_int(self.fetch(3))
-        self.destX = self.intOrIfNil(self.fetch(4), 0)
-        self.destY = self.intOrIfNil(self.fetch(5), 0)
-        self.width = self.intOrIfNil(self.fetch(6), self.dest.width)
-        self.height = self.intOrIfNil(self.fetch(7), self.dest.height)
-        self.clipX = self.intOrIfNil(self.fetch(10), 0)
-        self.clipY = self.intOrIfNil(self.fetch(11), 0)
-        self.clipW = self.intOrIfNil(self.fetch(12), self.width)
-        self.clipH = self.intOrIfNil(self.fetch(13), self.height)
+        self.halftone = self.loadHalftone(self.own_fetch(2))
+        self.combinationRule = self.space.unwrap_int(self.own_fetch(3))
+        self.destX = self.intOrIfNil(self.own_fetch(4), 0)
+        self.destY = self.intOrIfNil(self.own_fetch(5), 0)
+        self.width = self.intOrIfNil(self.own_fetch(6), self.dest.width)
+        self.height = self.intOrIfNil(self.own_fetch(7), self.dest.height)
+        self.clipX = self.intOrIfNil(self.own_fetch(10), 0)
+        self.clipY = self.intOrIfNil(self.own_fetch(11), 0)
+        self.clipW = self.intOrIfNil(self.own_fetch(12), self.width)
+        self.clipH = self.intOrIfNil(self.own_fetch(13), self.height)
         if not self.source:
             self.sourceX = 0
             self.sourceY = 0
         else:
-            self.loadColorMap(self.fetch(14))
-            self.sourceX = self.intOrIfNil(self.fetch(8), 0)
-            self.sourceY = self.intOrIfNil(self.fetch(9), 0)
+            self.loadColorMap(self.own_fetch(14))
+            self.sourceX = self.intOrIfNil(self.own_fetch(8), 0)
+            self.sourceY = self.intOrIfNil(self.own_fetch(9), 0)
 
     def copyBits(self):
         self.bitCount = 0
@@ -724,28 +722,29 @@ class BitBltShadow(AbstractCachingShadow):
 
 
 class FormShadow(AbstractCachingShadow):
+    repr_classname = "FormShadow"
     _attrs_ = ["w_bits", "width", "height", "depth", "offsetX",
                "offsetY", "msb", "pixPerWord", "pitch", "invalid"]
 
-    def __init__(self, space, w_self):
-        AbstractCachingShadow.__init__(self, space, w_self)
+    def __init__(self, space, w_self, size):
+        AbstractCachingShadow.__init__(self, space, w_self, size)
         self.invalid = False
 
     def intOrIfNil(self, w_int, i):
         return intOrIfNil(self.space, w_int, i)
 
-    def sync_cache(self):
+    def strategy_switched(self, w_self):
         self.invalid = True
-        if self.size() < 5:
+        if self.size(w_self) < 5:
             return
-        self.w_bits = self.fetch(0)
-        if self.w_bits is self.space.w_nil:
+        self.w_bits = self.own_fetch(0)
+        if self.w_bits.is_nil(self.space):
             return
-        if not (isinstance(self.w_bits, model.W_WordsObject) or isinstance(self.w_bits, model.W_DisplayBitmap)):
+        if not (isinstance(self.w_bits, model.W_WordsObject) or isinstance(self.w_bits, model_display.W_DisplayBitmap)):
             return
-        self.width = self.intOrIfNil(self.fetch(1), 0)
-        self.height = self.intOrIfNil(self.fetch(2), 0)
-        self.depth = self.intOrIfNil(self.fetch(3), 0)
+        self.width = self.intOrIfNil(self.own_fetch(1), 0)
+        self.height = self.intOrIfNil(self.own_fetch(2), 0)
+        self.depth = self.intOrIfNil(self.own_fetch(3), 0)
         if self.width < 0 or self.height < 0:
             return
         self.msb = self.depth > 0
@@ -753,11 +752,11 @@ class FormShadow(AbstractCachingShadow):
             self.depth = -self.depth
         if self.depth == 0:
             return
-        w_offset = self.fetch(4)
+        w_offset = self.own_fetch(4)
         assert isinstance(w_offset, model.W_PointersObject)
-        if not w_offset is self.space.w_nil:
-            self.offsetX = self.intOrIfNil(w_offset._fetch(0), 0)
-            self.offsetY = self.intOrIfNil(w_offset._fetch(1), 0)
+        if not w_offset.is_nil(self.space):
+            self.offsetX = self.intOrIfNil(w_offset.fetch(self.space, 0), 0)
+            self.offsetY = self.intOrIfNil(w_offset.fetch(self.space, 1), 0)
         self.pixPerWord = 32 / self.depth
         self.pitch = (self.width + (self.pixPerWord - 1)) / self.pixPerWord | 0
         if self.w_bits.size() < (self.pitch * self.height):

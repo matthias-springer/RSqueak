@@ -1,33 +1,33 @@
-from spyvm import model, constants
+from spyvm import model, model_display, constants
 from spyvm.error import FatalError, WrapperException, PrimitiveFailedError
 
 class Wrapper(object):
     def __init__(self, space, w_self):
         if not isinstance(w_self, model.W_PointersObject):
             raise WrapperException("Unexpected instance given to wrapper")
-        self._w_self = w_self
+        self.wrapped = w_self
         self.space = space
 
     def read(self, index0):
         try:
-            return self._w_self.fetch(self.space, index0)
+            return self.wrapped.fetch(self.space, index0)
             # XXX Index error never raised after translation
         except IndexError:
             raise WrapperException("Unexpected instance layout. Too small")
 
     def write(self, index0, w_new):
         try:
-            self._w_self.store(self.space, index0, w_new)
+            self.wrapped.store(self.space, index0, w_new)
             # XXX Index error never raised after translation
         except IndexError:
             raise WrapperException("Unexpected instance layout. Too small")
 
 class VarsizedWrapper(Wrapper):
     def at0(self, i0):
-        return self._w_self.at0(self.space, i0)
+        return self.wrapped.at0(self.space, i0)
 
     def atput0(self, i0, w_value):
-        return self._w_self.atput0(self.space, i0, w_value)
+        return self.wrapped.atput0(self.space, i0, w_value)
 
 
 def make_getter(index0):
@@ -69,57 +69,58 @@ class ProcessWrapper(LinkWrapper):
         sched = scheduler(self.space)
         priority = self.priority()
         process_list = sched.get_process_list(priority)
-        process_list.add_process(self._w_self)
+        process_list.add_process(self.wrapped)
 
     def activate(self):
         from spyvm.interpreter import ProcessSwitch
         assert not self.is_active_process()
         sched = scheduler(self.space)
-        sched.store_active_process(self._w_self)
+        sched.store_active_process(self.wrapped)
         w_frame = self.suspended_context()
         self.store_suspended_context(self.space.w_nil)
         self.store_my_list(self.space.w_nil)
         assert isinstance(w_frame, model.W_PointersObject)
         raise ProcessSwitch(w_frame.as_context_get_shadow(self.space))
 
-    def deactivate(self, w_current_frame):
-        self.put_to_sleep()
-        self.store_suspended_context(w_current_frame)
+    def deactivate(self, s_current_frame, put_to_sleep=True):
+        if put_to_sleep:
+            self.put_to_sleep()
+        self.store_suspended_context(s_current_frame.w_self())
 
-    def resume(self, w_current_frame):
+    def resume(self, s_current_frame):
         sched = scheduler(self.space)
         active_process = ProcessWrapper(self.space, sched.active_process())
         active_priority = active_process.priority()
         priority = self.priority()
         if priority > active_priority:
-            active_process.deactivate(w_current_frame)
-            return self.activate()
+            if not self.space.suppress_process_switch.is_set():
+                active_process.deactivate(s_current_frame)
+                self.activate()
         else:
             self.put_to_sleep()
-            return w_current_frame
 
     def is_active_process(self):
-        return self._w_self.is_same_object(scheduler(self.space).active_process())
+        return self.wrapped.is_same_object(scheduler(self.space).active_process())
 
-    def suspend(self, w_current_frame):
+    def suspend(self, s_current_frame):
         if self.is_active_process():
-            assert self.my_list().is_same_object(self.space.w_nil)
-            w_process = scheduler(self.space).pop_highest_priority_process()
-            self.store_suspended_context(w_current_frame)
-            return ProcessWrapper(self.space, w_process).activate()
+            if not self.space.suppress_process_switch.is_set():
+                assert self.my_list().is_nil(self.space)
+                w_process = scheduler(self.space).pop_highest_priority_process()
+                self.deactivate(s_current_frame, put_to_sleep=False)
+                ProcessWrapper(self.space, w_process).activate()
         else:
-            if self.my_list() is not self.space.w_nil:
+            if not self.my_list().is_nil(self.space):
                 process_list = ProcessListWrapper(self.space, self.my_list())
-                process_list.remove(self._w_self)
+                process_list.remove(self.wrapped)
                 self.store_my_list(self.space.w_nil)
-            return w_current_frame
 
 class LinkedListWrapper(Wrapper):
     first_link, store_first_link = make_getter_setter(0)
     last_link, store_last_link = make_getter_setter(1)
 
     def is_empty_list(self):
-        return self.first_link().is_same_object(self.space.w_nil)
+        return self.first_link().is_nil(self.space)
 
     def add_last_link(self, w_object):
         if self.is_empty_list():
@@ -147,13 +148,13 @@ class LinkedListWrapper(Wrapper):
         else:
             current = LinkWrapper(self.space, self.first_link())
             w_next = current.next_link()
-            while not w_next.is_same_object(self.space.w_nil):
+            while not w_next.is_nil(self.space):
                 if w_next.is_same_object(w_link):
                     LinkWrapper(self.space, w_link).store_next_link(self.space.w_nil)
                     w_tail = LinkWrapper(self.space, w_next).next_link()
                     current.store_next_link(w_tail)
-                    if w_tail.is_same_object(self.space.w_nil):
-                        self.store_last_link(current._w_self)
+                    if w_tail.is_nil(self.space):
+                        self.store_last_link(current.wrapped)
                     return
                 current = LinkWrapper(self.space, w_next)
                 w_next = current.next_link()
@@ -162,7 +163,7 @@ class LinkedListWrapper(Wrapper):
 class ProcessListWrapper(LinkedListWrapper):
     def add_process(self, w_process):
         self.add_last_link(w_process)
-        ProcessWrapper(self.space, w_process).store_my_list(self._w_self)
+        ProcessWrapper(self.space, w_process).store_my_list(self.wrapped)
 
 class AssociationWrapper(Wrapper):
     key = make_getter(0)
@@ -212,24 +213,22 @@ class SemaphoreWrapper(LinkedListWrapper):
 
     excess_signals, store_excess_signals = make_int_getter_setter(2)
 
-    def signal(self, w_current_frame):
+    def signal(self, s_current_frame):
         if self.is_empty_list():
             value = self.excess_signals()
             self.store_excess_signals(value + 1)
-            return w_current_frame
         else:
             process = self.remove_first_link_of_list()
-            return ProcessWrapper(self.space, process).resume(w_current_frame)
+            ProcessWrapper(self.space, process).resume(s_current_frame)
 
-    def wait(self, w_current_frame):
+    def wait(self, s_current_frame):
         excess = self.excess_signals()
         w_process = scheduler(self.space).active_process()
         if excess > 0:
             self.store_excess_signals(excess - 1)
-            return w_current_frame
         else:
             self.add_last_link(w_process)
-            return ProcessWrapper(self.space, w_process).suspend(w_current_frame)
+            ProcessWrapper(self.space, w_process).suspend(s_current_frame)
 
 class PointWrapper(Wrapper):
     x, store_x = make_int_getter_setter(0)
@@ -241,19 +240,15 @@ class BlockClosureWrapper(VarsizedWrapper):
     startpc, store_startpc = make_int_getter_setter(constants.BLKCLSR_STARTPC)
     numArgs, store_numArgs = make_int_getter_setter(constants.BLKCLSR_NUMARGS)
 
-    def asContextWithSender(self, w_context, arguments):
-        from spyvm import shadow
+    def create_frame(self, arguments=[]):
+        from spyvm import storage_contexts
         w_outerContext = self.outerContext()
         if not isinstance(w_outerContext, model.W_PointersObject):
             raise PrimitiveFailedError
         s_outerContext = w_outerContext.as_context_get_shadow(self.space)
-        s_method = s_outerContext.w_method().as_compiledmethod_get_shadow(self.space)
+        w_method = s_outerContext.w_method()
         w_receiver = s_outerContext.w_receiver()
-        pc = self.startpc() - s_method.bytecodeoffset - 1
-        w_new_frame = shadow.MethodContextShadow.make_context(self.space, s_method, w_receiver,
-                     arguments, s_sender=w_context.get_shadow(self.space),
-                     pc=pc, closure=self)
-        return w_new_frame
+        return storage_contexts.ContextPartShadow.build_method_context(self.space, w_method, w_receiver, arguments, self)
 
     def tempsize(self):
         # We ignore the number of temps a block has, because the first
@@ -264,7 +259,31 @@ class BlockClosureWrapper(VarsizedWrapper):
         return self.size() + self.numArgs()
 
     def size(self):
-        return self._w_self.size() - constants.BLKCLSR_SIZE
+        return self.wrapped.size() - constants.BLKCLSR_SIZE
+
+class FormWrapper(Wrapper):
+    bits, store_bits = make_getter_setter(constants.FORM_BITS)
+    width, store_width = make_int_getter_setter(constants.FORM_WIDTH)
+    height, store_height = make_int_getter_setter(constants.FORM_HEIGHT)
+    depth, store_depth = make_int_getter_setter(constants.FORM_DEPTH)
+
+    def create_display_bitmap(self):
+        w_display_bitmap = model_display.from_words_object(self.bits(), self)
+        self.store_bits(w_display_bitmap)
+        return w_display_bitmap
+
+    def get_display_bitmap(self):
+        w_bitmap = self.bits()
+        if not isinstance(w_bitmap, model_display.W_DisplayBitmap):
+            w_display_bitmap = self.create_display_bitmap()
+        else:
+            w_display_bitmap = w_bitmap
+            if w_display_bitmap._depth != self.depth():
+                w_display_bitmap = self.create_display_bitmap()
+        return w_display_bitmap
+
+    def take_over_display(self):
+        self.space.display().set_video_mode(self.width(), self.height(), self.depth())
 
 # XXX Wrappers below are not used yet.
 class OffsetWrapper(Wrapper):

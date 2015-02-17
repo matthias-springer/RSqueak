@@ -906,15 +906,9 @@ class W_WordsObject(W_AbstractObjectWithClassReference):
         return space.wrap_int(intmask(short))
 
     def short_atput0(self, space, index0, w_value):
-        from rpython.rlib.rarithmetic import int_between
-        i_value = space.unwrap_int(w_value)
-        if system.IS_64BIT:
-            if (not int_between(0, i_value, 0x8000) and
-                not int_between(0, i_value ^ (0xffffffff), 0x8000)):
-                raise error.PrimitiveFailedError
-        else:
-            if not int_between(constants.MININT, i_value, constants.MAXINT):
-                raise error.PrimitiveFailedError
+        i_value = r_uint(space.unwrap_int(w_value))
+        if i_value > 0xffff:
+            raise error.PrimitiveFailedError
         word_index0 = index0 / 2
         word = intmask(r_uint32(self.getword(word_index0)))
         if index0 % 2 == 0:

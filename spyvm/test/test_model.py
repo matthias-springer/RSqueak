@@ -1,6 +1,6 @@
 import py, math, socket
 from spyvm import model, model_display, storage_classes, error, display, constants
-from rpython.rlib.rarithmetic import intmask, r_uint
+from rpython.rlib.rarithmetic import intmask, r_uint, r_uint32
 from rpython.rtyper.lltypesystem import lltype, rffi
 from .util import create_space, copy_to_module, cleanup_module
 
@@ -377,8 +377,8 @@ def test_WordsObject_short_at():
 def test_WordsObject_short_atput():
     target = model.W_WordsObject(space, None, 2)
     target.short_atput0(space, 0, space.wrap_int(0x0100))
-    target.short_atput0(space, 1, space.wrap_int(-1))
-    target.short_atput0(space, 2, space.wrap_int(intmask(0xffff8000)))
+    target.short_atput0(space, 1, space.wrap_int(-1 & 0xffff))
+    target.short_atput0(space, 2, space.wrap_int(0xffff8000 & 0xffff))
     target.short_atput0(space, 3, space.wrap_int(0x7fff))
     assert target.getword(0) == 0xffff0100
     assert target.getword(1) == 0x7fff8000
@@ -388,14 +388,14 @@ def test_display_bitmap():
     space.display().set_video_mode(32, size, 1)
     target = model_display.W_MappingDisplayBitmap(space, space.w_Array, size, 1)
     for idx in range(size):
-        target.setword(idx, r_uint(0))
+        target.setword(idx, r_uint32(0))
     target.take_over_display()
 
-    target.setword(0, r_uint(0xFF00))
+    target.setword(0, r_uint32(0xFF00))
     assert bin(target.getword(0)) == bin(0xFF00)
-    target.setword(0, r_uint(0x00FF00FF))
+    target.setword(0, r_uint32(0x00FF00FF))
     assert bin(target.getword(0)) == bin(0x00FF00FF)
-    target.setword(0, r_uint(0xFF00FF00))
+    target.setword(0, r_uint32(0xFF00FF00))
     assert bin(target.getword(0)) == bin(0xFF00FF00)
 
     buf = target.pixelbuffer()

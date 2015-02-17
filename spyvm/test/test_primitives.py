@@ -176,9 +176,10 @@ def test_small_int_bit_shift_negative():
 def test_small_int_bit_shift_fail():
     prim_fails(primitives.BIT_SHIFT, [4, 32])
     prim_fails(primitives.BIT_SHIFT, [4, 31])
-    w_result = prim(primitives.BIT_SHIFT, [4, 29])
-    assert isinstance(w_result, model.W_LargePositiveInteger1Word)
-    assert w_result.value == intmask(4 << 29)
+    prim_fails(primitives.BIT_SHIFT, [4, 28])
+    w_result = prim(primitives.BIT_SHIFT, [4, 27])
+    assert isinstance(w_result, model.W_SmallInteger)
+    assert w_result.value == intmask(4 << 27)
 
 def test_smallint_as_float():
     assert prim(primitives.SMALLINT_AS_FLOAT, [12]).value == 12.0

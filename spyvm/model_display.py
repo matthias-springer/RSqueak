@@ -1,9 +1,8 @@
 
 from spyvm import model, constants, display
 from rpython.rlib import jit, objectmodel
-from rpython.rtyper.lltypesystem import lltype, rffi
-from rpython.rlib.rarithmetic import r_uint
-
+from rpython.rtyper.lltypesystem import rffi
+from rpython.rlib.rarithmetic import r_uint, r_uint32
 
 
 def map_word_argb(word):
@@ -52,7 +51,7 @@ class W_DisplayBitmap(model.W_AbstractObjectWithClassReference):
 
     def __init__(self, space, w_class, size, depth):
         model.W_AbstractObjectWithClassReference.__init__(self, space, w_class)
-        self._real_depth_buffer = lltype.malloc(rffi.CArray(rffi.UINT), size, flavor='raw')
+        self._real_depth_buffer = [r_uint32(0)] * size
         self._realsize = size
         self._depth = depth
         self.display = space.display()
@@ -126,9 +125,6 @@ class W_DisplayBitmap(model.W_AbstractObjectWithClassReference):
         # TODO - implement _become() for this class. Impossible due to _immutable_fields_?
         return False
 
-    def __del__(self):
-        lltype.free(self._real_depth_buffer, flavor='raw')
-
     def repr_content(self):
         return "len=%d depth=%d %s" % (self.size(), self._depth, self.str_content())
 
@@ -197,7 +193,7 @@ class W_MappingDisplayBitmap(W_DisplayBitmap):
         else:
             bits = BITS
 
-        word = r_uint(word)
+        word = r_uint32(word)
         pos = self.compute_pos(n)
         buf = rffi.ptradd(self.display.screen.c_pixels, pos)
         depth = r_uint(self._depth)

@@ -165,8 +165,9 @@ MAX_UINT = (1<<31) - 1
 MAXINT = 2 ** (LONG_BIT - 2) - 1 # SmallIntegers are tagged
 MININT = -2 ** (LONG_BIT - 2)
 
+SYSTEM_MAX_UINT = 2**64-1 if system.IS_64BIT else 2**32-1
 SYSTEM_MAXINT = sys.maxint
-SYSTEM_MININT = -sys.maxint-1
+SYSTEM_MININT = -SYSTEM_MAXINT-1
 
 
 # Entries into SO_SPECIAL_SELECTORS_ARRAY:

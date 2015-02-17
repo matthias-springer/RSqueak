@@ -194,7 +194,7 @@ class W_MappingDisplayBitmap(W_DisplayBitmap):
         else:
             bits = BITS
 
-        from 
+        from spyvm.model import widen
         word = widen(r_uint32(word))
         pos = self.compute_pos(n)
         buf = rffi.ptradd(self.display.screen.c_pixels, pos)

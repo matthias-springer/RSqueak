@@ -193,15 +193,14 @@ class W_MappingDisplayBitmap(W_DisplayBitmap):
             bits = self.bits_in_last_word
         else:
             bits = BITS
-
-        from spyvm.model import widen
-        word = widen(r_uint32(word))
+        
         pos = self.compute_pos(n)
         buf = rffi.ptradd(self.display.screen.c_pixels, pos)
         depth = r_uint(self._depth)
         rshift = BITS - depth
         for i in range(bits / depth):
             pixel = word >> rshift
+            word &= 0xffffffff
             buf[i] = rffi.cast(rffi.UCHAR, pixel)
             word <<= depth
 

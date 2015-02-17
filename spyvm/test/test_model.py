@@ -390,6 +390,7 @@ def test_display_bitmap():
     for idx in range(size):
         target.setword(idx, r_uint32(0))
     target.take_over_display()
+    buf = target.pixelbuffer()
 
     target.setword(0, r_uint32(0xFF00))
     assert bin(target.getword(0)) == bin(0xFF00)
@@ -398,7 +399,6 @@ def test_display_bitmap():
     target.setword(0, r_uint32(0xFF00FF00))
     assert bin(target.getword(0)) == bin(0xFF00FF00)
 
-    buf = target.pixelbuffer()
     for i in xrange(2):
         assert buf[i] == 0x01010101
     for i in xrange(2, 4):

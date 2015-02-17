@@ -407,7 +407,7 @@ def integerValueOf(w_object):
 
 @expose_on_virtual_machine_proxy([int], oop)
 def positive32BitIntegerFor(n):
-    return IProxy.space.wrap_positive_int(n)
+    return IProxy.space.wrap_positive_int(r_uint(n))
 
 @expose_on_virtual_machine_proxy([oop], int)
 def positive32BitValueOf(n):

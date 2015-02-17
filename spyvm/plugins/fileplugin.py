@@ -2,6 +2,7 @@ import os, stat, sys
 
 from rpython.rlib import jit, rarithmetic
 from rpython.rlib.listsort import TimSort
+from rpython.rlib.rarithmetic import r_uint
 
 from spyvm import model, error
 from spyvm.plugins.plugin import Plugin
@@ -49,7 +50,7 @@ def primitiveDirectoryLookup(interp, s_frame, w_file_directory, full_path, index
     w_creationTime = smalltalk_timestamp(space, file_info.st_ctime)
     w_modificationTime = smalltalk_timestamp(space, file_info.st_mtime)
     w_dirFlag = space.w_true if stat.S_IFDIR & file_info.st_mode else space.w_false
-    w_fileSize = space.wrap_int(rarithmetic.intmask(file_info.st_size))
+    w_fileSize = space.wrap_int(file_info.st_size)
 
     return space.wrap_list([w_name, w_creationTime, w_modificationTime,
                             w_dirFlag, w_fileSize])
@@ -112,7 +113,7 @@ def primitiveFileGetPosition(interp, s_frame, w_rcvr, fd):
     except OSError:
         raise PrimitiveFailedError
     else:
-        return interp.space.wrap_positive_int(rarithmetic.intmask(pos))
+        return interp.space.wrap_positive_int(r_uint(pos))
 
 @FilePlugin.expose_primitive(unwrap_spec=[object, int, int])
 def primitiveFileSetPosition(interp, s_frame, w_rcvr, fd, position):
@@ -128,7 +129,7 @@ def primitiveFileSize(interp, s_frame, w_rcvr, fd):
         file_info = os.fstat(fd)
     except OSError:
         raise PrimitiveFailedError
-    return interp.space.wrap_positive_int(rarithmetic.intmask(file_info.st_size))
+    return interp.space.wrap_positive_int(r_uint(file_info.st_size))
 
 @FilePlugin.expose_primitive(unwrap_spec=[object])
 def primitiveFileStdioHandles(interp, s_frame, w_rcvr):
@@ -148,7 +149,7 @@ def primitiveFileWrite(interp, s_frame, w_rcvr, fd, a_string, start, count):
     except OSError:
         raise PrimitiveFailedError
     else:
-        return space.wrap_positive_int(rarithmetic.intmask(written))
+        return space.wrap_positive_int(r_uint(written))
 
 @jit.elidable
 def smalltalk_timestamp(space, sec_since_epoch):

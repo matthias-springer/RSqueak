@@ -215,8 +215,6 @@ class W_SmallInteger(W_Object):
 
     def __init__(self, value):
         self.value = intmask(value)
-        if not self.invariant():
-            import pdb; pdb.set_trace()
 
     def getclass(self, space):
         return space.w_SmallInteger
@@ -234,23 +232,20 @@ class W_SmallInteger(W_Object):
         upperbound = intmask(r_uint(-1) >> shift)
         if 0 <= self.value <= upperbound:
             shifted = intmask(self.value << shift)
-            return space.wrap_positive_int(shifted)
+            return space.wrap_int(shifted)
         else:
             try:
                 shifted = ovfcheck(self.value << shift)
             except OverflowError:
                 raise error.PrimitiveFailedError()
             return space.wrap_int(shifted)
-        raise PrimitiveFailedError
 
     def rshift(self, space, shift):
         return space.wrap_int(self.value >> shift)
 
     def unwrap_uint(self, space):
-        from rpython.rlib.rarithmetic import r_uint
-        val = self.value
         # Assume the caller knows what he does, even if int is negative
-        return r_uint(val)
+        return r_uint(self.value)
 
     def guess_classname(self):
         return "SmallInteger"
@@ -345,9 +340,6 @@ class W_LargePositiveInteger1Word(W_AbstractObjectWithIdentityHash):
     def guess_classname(self):
         return "LargePositiveInteger"
 
-    def invariant(self):
-        return isinstance(self.value, int)
-
     def str_content(self):
         return "%d" % r_uint(self.value)
 
@@ -357,7 +349,7 @@ class W_LargePositiveInteger1Word(W_AbstractObjectWithIdentityHash):
         upperbound = intmask(r_uint(-1) >> shift)
         if 0 <= self.value <= upperbound:
             shifted = intmask(self.value << shift)
-            return space.wrap_positive_int(shifted)
+            return space.wrap_positive_int(r_uint(shifted))
         else:
             raise error.PrimitiveFailedError()
 
@@ -374,7 +366,7 @@ class W_LargePositiveInteger1Word(W_AbstractObjectWithIdentityHash):
         return r_uint(self.value)
 
     def clone(self, space):
-        return W_LargePositiveInteger1Word(self.value)
+        return W_LargePositiveInteger1Word(r_uint(self.value))
 
     def at0(self, space, index0):
         if index0 >= self.size():
@@ -397,7 +389,7 @@ class W_LargePositiveInteger1Word(W_AbstractObjectWithIdentityHash):
         return self._exposed_size
 
     def invariant(self):
-        return isinstance(self.value, int)
+        return isinstance(self.value, r_uint)
 
     def is_array_object(self):
         return True
@@ -906,8 +898,8 @@ class W_WordsObject(W_AbstractObjectWithClassReference):
         return space.wrap_int(intmask(short))
 
     def short_atput0(self, space, index0, w_value):
-        i_value = r_uint(space.unwrap_int(w_value))
-        if i_value > 0xffff:
+        i_value = intmask(space.unwrap_int(w_value))
+        if i_value > constants.MAX_UINT:
             raise error.PrimitiveFailedError
         word_index0 = index0 / 2
         word = intmask(r_uint32(self.getword(word_index0)))

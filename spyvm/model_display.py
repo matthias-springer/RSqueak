@@ -2,7 +2,7 @@
 from spyvm import model, constants, display
 from rpython.rlib import jit, objectmodel
 from rpython.rtyper.lltypesystem import rffi
-from rpython.rlib.rarithmetic import r_uint, r_uint32
+from rpython.rlib.rarithmetic import r_uint, r_uint32, intmask
 
 
 def map_word_argb(word):
@@ -88,7 +88,7 @@ class W_DisplayBitmap(model.W_AbstractObjectWithClassReference):
         return self.display.get_pixelbuffer_UCHAR()
 
     def set_pixelbuffer_word(self, n, word):
-        self.pixelbuffer()[n] = map_word(word)
+        self.pixelbuffer()[n] = r_uint32(map_word(word))
 
     def take_over_display(self):
         # Make sure FrameWrapper.take_over_display() is called first for the correct Frame object.
@@ -133,6 +133,7 @@ class W_16BitDisplayBitmap(W_DisplayBitmap):
     repr_classname = "W_16BitDisplayBitmap"
 
     def set_pixelbuffer_word(self, n, word):
+        word = intmask(r_uint32(word))
         mask = 0b11111
         lsb = (r_uint(word) & r_uint(0xffff0000)) >> 16
         msb = (r_uint(word) & r_uint(0x0000ffff))
@@ -149,7 +150,7 @@ class W_16BitDisplayBitmap(W_DisplayBitmap):
             ((msb & mask) << 11)
         )
 
-        self.pixelbuffer()[n] = r_uint(lsb | (msb << 16))
+        self.pixelbuffer()[n] = r_uint32(lsb | (msb << 16))
 
 class W_8BitDisplayBitmap(W_DisplayBitmap):
 
@@ -157,7 +158,7 @@ class W_8BitDisplayBitmap(W_DisplayBitmap):
 
     def set_pixelbuffer_word(self, n, word):
         # Invert the byte-order.
-        self.pixelbuffer()[n] = r_uint(
+        self.pixelbuffer()[n] = r_uint32(
             (word >> 24) |
             ((word >> 8) & 0x0000ff00) |
             ((word << 8) & 0x00ff0000) |
@@ -193,7 +194,8 @@ class W_MappingDisplayBitmap(W_DisplayBitmap):
         else:
             bits = BITS
 
-        word = r_uint32(word)
+        from 
+        word = widen(r_uint32(word))
         pos = self.compute_pos(n)
         buf = rffi.ptradd(self.display.screen.c_pixels, pos)
         depth = r_uint(self._depth)

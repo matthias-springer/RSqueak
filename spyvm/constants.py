@@ -1,6 +1,7 @@
 import sys
 import time
 from rpython.rlib.jit import elidable
+from rpython.rlib.rarithmetic import r_uint
 from spyvm.util import system
 
 from spyvm.util.bitmanipulation import splitter
@@ -165,7 +166,7 @@ MAX_UINT = (1<<31) - 1
 MAXINT = 2 ** (LONG_BIT - 2) - 1 # SmallIntegers are tagged
 MININT = -2 ** (LONG_BIT - 2)
 
-SYSTEM_MAX_UINT = 2**64-1 if system.IS_64BIT else 2**32-1
+SYSTEM_MAX_UINT = r_uint(2**64-1 if system.IS_64BIT else 2**32-1)
 SYSTEM_MAXINT = sys.maxint
 SYSTEM_MININT = -SYSTEM_MAXINT-1
 

@@ -219,7 +219,7 @@ for (code,op) in bitwise_binary_ops.items():
         @expose_primitive(code, unwrap_spec=[pos_32bit_int, pos_32bit_int])
         def func(interp, s_frame, receiver, argument):
             res = op(receiver, argument)
-            return interp.space.wrap_positive_int(rarithmetic.intmask(res))
+            return interp.space.wrap_positive_int(r_uint(res))
     make_func(op)
 
 # #/ -- return the result of a division, only succeed if the division is exact
@@ -316,7 +316,7 @@ def func(interp, s_frame, f):
         raise PrimitiveFailedError
     try:
         return interp.space.wrap_int(integer) # in 64bit VMs, this may fail
-    except WrappingError:
+    except error.WrappingError:
         raise PrimitiveFailedError
 
 @expose_primitive(FLOAT_TIMES_TWO_POWER, unwrap_spec=[float, int])

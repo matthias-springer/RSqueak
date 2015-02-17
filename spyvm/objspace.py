@@ -150,10 +150,10 @@ class ObjSpace(object):
     def wrap_int(self, val):
         if not isinstance(val, int):
             raise WrappingError
-        if int_between(constants.MININT, val, constants.MAXINT+1):
+        if constants.MININT <= val <= constants.MAXINT:
             return model.W_SmallInteger(val)
-        elif int_between(0, val, constants.SYSTEM_MAX_UINT):
-            return model.W_LargePositiveInteger1Word(val)
+        elif 0 <= val <= constants.SYSTEM_MAX_UINT:
+            return model.W_LargePositiveInteger1Word(r_uint(val))
         else:
             raise WrappingError("Cannot wrap_int: %x" % val)
 
@@ -167,7 +167,7 @@ class ObjSpace(object):
         # This will always return a positive value.
         uval = r_uint(val)
         if val <= constants.MAXINT:
-            return model.W_SmallInteger(val)
+            return model.W_SmallInteger(intmask(val))
         elif val <= constants.SYSTEM_MAX_UINT:
             return model.W_LargePositiveInteger1Word(val)
         else:

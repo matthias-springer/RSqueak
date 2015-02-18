@@ -10,15 +10,15 @@ from rpython.rlib.rarithmetic import intmask, r_uint, int_between
 class ConstantMixin(object):
     """Mixin for constant values that can be edited, but will be promoted
     to a constant when jitting."""
-    
+
     def __init__(self, initial_value = None):
         if initial_value is None:
             initial_value = self.default_value
         self.value = [initial_value]
-    
+
     def set(self, value):
         self.value[0] = value
-    
+
     def get(self):
         value = jit.promote(self.value[0])
         return value
@@ -39,14 +39,14 @@ class ConstantString(object):
     def get(self):
         # Promoting does not work on strings...
         return self.value[0]
-    
+
 class ConstantObject(object):
     import_from_mixin(ConstantMixin)
     default_value = None
 
 def empty_object():
     return instantiate(model.W_PointersObject)
-    
+
 class ObjSpace(object):
     _immutable_fields_ = ['objtable']
 
@@ -58,19 +58,19 @@ class ObjSpace(object):
         self.use_plugins = ConstantFlag()
         self.omit_printing_raw_bytes = ConstantFlag()
         self.image_loaded = ConstantFlag()
-        
+
         self.classtable = {}
         self.objtable = {}
         self._executable_path = ConstantString()
         self._image_name = ConstantString()
         self._display = ConstantObject()
-        
+
         # Create the nil object.
         # Circumvent the constructor because nil is already referenced there.
         w_nil = empty_object()
         w_nil.w_class = None
         self.add_bootstrap_object("w_nil", w_nil)
-        
+
         self.strategy_factory = storage.StrategyFactory(self)
         self.make_bootstrap_classes()
         self.make_bootstrap_objects()
@@ -106,25 +106,25 @@ class ObjSpace(object):
                     self.objtable[name] = None
         # XXX this is kind of hacky, but I don't know where else to get Metaclass
         self.classtable["w_Metaclass"] = self.w_SmallInteger.w_class.w_class
-    
+
     def add_bootstrap_class(self, name, cls):
         self.classtable[name] = cls
         setattr(self, name, cls)
-    
+
     def make_bootstrap_classes(self):
         names = [ "w_" + name for name in constants.classes_in_special_object_table.keys() ]
         for name in names:
             cls = empty_object()
             self.add_bootstrap_class(name, cls)
-        
+
     def add_bootstrap_object(self, name, obj):
         self.objtable[name] = obj
         setattr(self, name, obj)
-    
+
     def make_bootstrap_object(self, name):
         obj = empty_object()
         self.add_bootstrap_object(name, obj)
-    
+
     def make_bootstrap_objects(self):
         self.make_bootstrap_object("w_charactertable")
         self.make_bootstrap_object("w_true")
@@ -134,7 +134,7 @@ class ObjSpace(object):
         self.add_bootstrap_object("w_zero", model.W_SmallInteger(0))
         self.add_bootstrap_object("w_one", model.W_SmallInteger(1))
         self.add_bootstrap_object("w_two", model.W_SmallInteger(2))
-        
+
         # Certain special objects are already created. The rest will be
         # populated when the image is loaded, but prepare empty slots for them.
         for name in constants.objects_in_special_object_table:
@@ -217,7 +217,7 @@ class ObjSpace(object):
                 return intmask(w_value.value)
             else:
                 raise UnwrappingError("The value is negative when interpreted as 32bit value.")
-        raise UnwrappingError("expected a W_SmallInteger or W_LargePositiveInteger1Word, got %s" % (w_value,))
+        raise UnwrappingError("expected a W_SmallInteger or W_LargePositiveInteger1Word")
 
     def unwrap_uint(self, w_value):
         return w_value.unwrap_uint(self)
@@ -234,11 +234,11 @@ class ObjSpace(object):
         from spyvm import constants
         w_class = w_char.getclass(self)
         if not w_class.is_same_object(self.w_Character):
-            raise UnwrappingError("expected character, got %s" % (w_class, ))
+            raise UnwrappingError("expected Character")
         w_ord = w_char.fetch(self, constants.CHARACTER_VALUE_INDEX)
         w_class = w_ord.getclass(self)
         if not w_class.is_same_object(self.w_SmallInteger):
-            raise UnwrappingError("expected smallint from character, got %s" % (w_class, ))
+            raise UnwrappingError("expected SmallInteger from Character")
 
         assert isinstance(w_ord, model.W_SmallInteger)
         return chr(w_ord.value)
@@ -247,31 +247,31 @@ class ObjSpace(object):
         from spyvm import model
         if isinstance(w_v, model.W_Float): return w_v.value
         elif isinstance(w_v, model.W_SmallInteger): return float(w_v.value)
-        raise UnwrappingError()
+        raise UnwrappingError
 
     @jit.look_inside_iff(lambda self, w_array: jit.isconstant(w_array.size()))
     def unwrap_array(self, w_array):
         # Check that our argument has pointers format and the class:
         if not w_array.getclass(self).is_same_object(self.w_Array):
-            raise UnwrappingError()
+            raise UnwrappingError
         assert isinstance(w_array, model.W_PointersObject)
 
         return [w_array.at0(self, i) for i in range(w_array.size())]
 
     # ============= Access to static information =============
-    
+
     @specialize.arg(1)
     def get_special_selector(self, selector):
         i0 = constants.find_selectorindex(selector)
         self.w_special_selectors.as_cached_object_get_shadow(self)
         return self.w_special_selectors.fetch(self, i0)
-    
+
     def executable_path(self):
         return self._executable_path.get()
-    
+
     def image_name(self):
         return self._image_name.get()
-    
+
     def display(self):
         disp = self._display.get()
         if disp is None:
@@ -279,9 +279,9 @@ class ObjSpace(object):
             disp = display.SDLDisplay(self.image_name())
             self._display.set(disp)
         return disp
-    
+
     # ============= Other Methods =============
-    
+
     def _freeze_(self):
         return True
 

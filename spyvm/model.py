@@ -918,7 +918,8 @@ class W_WordsObject(W_AbstractObjectWithClassReference):
 
     def setword(self, n, word):
         if self.words is None:
-            self.c_words[n] = intmask(word)
+            from spyvm.plugins.squeak_plugin_proxy import sqInt
+            self.c_words[n] = rffi.cast(sqInt, word)
         else:
             self.words[n] = r_uint(word)
 
@@ -978,9 +979,10 @@ class W_WordsObject(W_AbstractObjectWithClassReference):
             size = self.size()
             old_words = self.words
             from spyvm.plugins.squeak_plugin_proxy import sqIntArrayPtr
+            from spyvm.plugins.squeak_plugin_proxy import sqInt
             c_words = self.c_words = lltype.malloc(sqIntArrayPtr.TO, size, flavor='raw')
             for i in range(size):
-                c_words[i] = intmask(old_words[i])
+                c_words[i] = rffi.cast(sqInt, old_words[i])
             self.words = None
             return c_words
 

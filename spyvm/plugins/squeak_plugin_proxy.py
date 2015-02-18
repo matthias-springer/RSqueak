@@ -76,6 +76,9 @@ def expose_on_virtual_machine_proxy(unwrap_spec, result_type, minor=0, major=1):
                     assert isinstance(result, model.W_Object)
                     return IProxy.object_to_oop(result)
                 elif result_type in (int, float):
+                    #assert isinstance(result, result_type)
+                    return int(result)
+                elif result_type is float:
                     assert isinstance(result, result_type)
                     return result
                 elif result_type is bool:

@@ -1,7 +1,7 @@
 
 from spyvm import model, constants, display
 from rpython.rlib import jit, objectmodel
-from rpython.rtyper.lltypesystem import rffi
+from rpython.rtyper.lltypesystem import rffi, lltype
 from rpython.rlib.rarithmetic import r_uint, r_uint32, intmask
 
 

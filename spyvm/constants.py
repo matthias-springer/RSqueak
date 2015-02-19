@@ -165,6 +165,8 @@ TAGGED_MASK = int(2 ** (LONG_BIT - 1) - 1)
 MAX_UINT = (1<<31) - 1
 MAXINT = 2 ** (LONG_BIT - 2) - 1 # SmallIntegers are tagged
 MININT = -2 ** (LONG_BIT - 2)
+MAXINT32 = 2 ** (LONG_BIT - 1) - 1 # SmallIntegers are tagged
+MININT32 = -2 ** (LONG_BIT - 1)
 
 SYSTEM_MAX_UINT = r_uint(2**64-1 if system.IS_64BIT else 2**32-1)
 SYSTEM_MAXINT = sys.maxint
@@ -175,6 +177,7 @@ if system.IS_64BIT:
 else:
     def widen(x):
         return x
+
 
 # Entries into SO_SPECIAL_SELECTORS_ARRAY:
 #(#+ 1 #- 1 #< 1 #> 1 #<= 1 #>= 1 #= 1 #~= 1 #* 1 #/ 1 #\\ 1 #@ 1 #bitShift: 1 #// 1 #bitAnd: 1 #bitOr: 1 #at: 1 #at:put: 2 #size 0 #next 0 #nextPut: 1 #atEnd 0 #== 1 #class 0 #blockCopy: 1 #value 0 #value: 1 #do: 1 #new 0 #new: 1 #x 0 #y 0)

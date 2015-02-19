@@ -15,6 +15,7 @@ import sys
 from spyvm import constants, error
 from spyvm.util import system
 from spyvm.util.version import constant_for_version, constant_for_version_arg, VersionMixin
+from spyvm.constants import widen
 
 from rpython.rlib import rrandom, objectmodel, jit, signature
 from rpython.rlib.rarithmetic import intmask, r_uint32, r_uint, r_int
@@ -24,14 +25,6 @@ from rpython.rlib.objectmodel import instantiate, compute_hash, import_from_mixi
 from rpython.rtyper.lltypesystem import lltype, rffi
 from rsdl import RSDL, RSDL_helper
 import rstrategies as rstrat
-
-
-if system.IS_64BIT:
-    from rpython.rlib.rarithmetic import widen
-else:
-    def widen(x):
-        return x
-
 
 class W_Object(object):
     """Root of Squeak model, abstract."""

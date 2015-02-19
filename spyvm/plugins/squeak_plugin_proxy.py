@@ -19,7 +19,7 @@ from rpython.rlib.exports import export_struct
 from rpython.rtyper.lltypesystem.lltype import FuncType, Ptr
 from rpython.rtyper.lltypesystem import lltype, rffi
 from rpython.rlib.unroll import unrolling_iterable
-from rpython.rlib.rarithmetic import intmask, r_uint, r_int
+from rpython.rlib.rarithmetic import intmask, r_uint, r_uint32, r_int
 
 from spyvm import error, model, model_display, objspace, wrapper
 
@@ -75,8 +75,11 @@ def expose_on_virtual_machine_proxy(unwrap_spec, result_type, minor=0, major=1):
                 if result_type is oop:
                     assert isinstance(result, model.W_Object)
                     return IProxy.object_to_oop(result)
+                elif result_type in (r_uint, r_uint32):
+                    assert isinstance(result, result_type)
+                    return intmask(result)
                 elif result_type in (int, float):
-                    #assert isinstance(result, result_type)
+                    assert isinstance(result, result_type)
                     return int(result)
                 elif result_type is float:
                     assert isinstance(result, result_type)

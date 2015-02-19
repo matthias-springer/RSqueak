@@ -4,7 +4,6 @@ from rpython.rlib import jit, objectmodel
 from rpython.rtyper.lltypesystem import rffi, lltype
 from rpython.rlib.rarithmetic import r_uint, r_uint32, intmask
 
-
 def map_word_argb(word):
     return word
 def map_word_bgra(word):
@@ -206,7 +205,7 @@ class W_MappingDisplayBitmap(W_DisplayBitmap):
         rshift = BITS - depth
         for i in range(bits / depth):
             pixel = word >> rshift
-            word &= 0xffffffff
+            word &= r_uint32(0xffffffff)
             buf[i] = rffi.cast(rffi.UCHAR, pixel)
             word <<= depth
 

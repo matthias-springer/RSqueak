@@ -28,15 +28,6 @@ def assert_pointers(w_obj):
         raise PrimitiveFailedError
     return w_obj
 
-if system.IS_64BIT:
-    def check_32bit_overflow(num):
-        # TODO find a cleaner way to handle this error?
-        if num > constants.MAXINT32 or num < constants.MININT32:
-            raise PrimitiveFailedError()
-else:
-    def check_32bit_overflow(num):
-        pass
-
 # ___________________________________________________________________________
 # Primitive table: it is filled in at initialization time with the
 # primitive functions.  Each primitive function takes two
@@ -208,7 +199,6 @@ for (code,op) in math_ops.items():
                 res = rarithmetic.ovfcheck(op(receiver, argument))
             except OverflowError:
                 raise PrimitiveFailedError()
-            check_32bit_overflow(res)
             return interp.space.wrap_int(res)
     make_func(op)
 
@@ -268,8 +258,6 @@ def func(interp, s_frame, receiver, argument):
             res = receiver.lshift(interp.space, argument)
         else:
             res = receiver.rshift(interp.space, -argument)
-        if system.IS_64BIT:
-            check_32bit_overflow(interp.space.unwrap_int(res))
         return res
     else:
         raise PrimitiveFailedError()

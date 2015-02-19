@@ -256,9 +256,11 @@ def test_large_positive_integer_operation_add():
 
 def test_large_positive_integer_operation_times():
     w_result = perform(interp.space.w_SmallInteger, "maxVal")
+    val = interp.space.unwrap_int(w_result)
     w_result = perform(w_result, "*", w_result)
     assert w_result is not None
-    assert isinstance(w_result, model.W_BytesObject)
+    assert w_result.getclass(interp.space) == interp.space.w_LargePositiveInteger
+    assert w_result.unwrap_uint(interp.space) == val*val
 
 def test_doesNotUnderstand():
     w_dnu = interp.space.objtable["w_doesNotUnderstand"]

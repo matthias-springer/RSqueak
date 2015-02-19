@@ -2,6 +2,7 @@ import py, os, math, time
 from spyvm import model, model_display, storage_contexts, constants, primitives, wrapper, display
 from spyvm.primitives import prim_table, PrimitiveFailedError
 from spyvm.plugins import bitblt
+from spyvm.util import system
 from rpython.rlib.rfloat import isinf, isnan
 from rpython.rlib.rarithmetic import intmask
 from rpython.rtyper.lltypesystem import lltype, rffi
@@ -75,7 +76,7 @@ def test_small_int_add_fail():
     w_result = prim(primitives.ADD, [constants.MAXINT, 2])
     assert isinstance(w_result, model.W_LargePositiveInteger1Word)
     assert w_result.value == constants.MAXINT + 2
-    prim_fails(primitives.ADD, [constants.MAXINT, constants.MAXINT * 2])
+    prim_fails(primitives.ADD, [constants.MAXINT, constants.SYSTEM_MAXINT])
 
 def test_small_int_minus():
     assert prim(primitives.SUBTRACT, [5,9]).value == -4
@@ -92,10 +93,9 @@ def test_small_int_multiply_overflow():
     w_result = prim(primitives.MULTIPLY, [constants.MAXINT, 2])
     assert isinstance(w_result, model.W_LargePositiveInteger1Word)
     assert w_result.value == constants.MAXINT * 2
-    prim_fails(primitives.MULTIPLY, [constants.MAXINT, constants.MAXINT])
-    prim_fails(primitives.MULTIPLY, [constants.MAXINT, -4])
-    prim_fails(primitives.MULTIPLY, [constants.MININT, constants.MAXINT])
-    prim_fails(primitives.MULTIPLY, [constants.MININT, 2])
+    prim_fails(primitives.MULTIPLY, [constants.MAXINT, constants.SYSTEM_MAXINT])
+    prim_fails(primitives.MULTIPLY, [constants.SYSTEM_MAX_UINT, -4])
+    prim_fails(primitives.MULTIPLY, [constants.MININT, constants.SYSTEM_MAXINT])
 
 def test_small_int_divide():
     assert prim(primitives.DIVIDE, [6,3]).value == 2
@@ -179,15 +179,21 @@ def test_small_int_bit_shift_negative():
     assert prim(primitives.BIT_SHIFT, [-4, 27]).value == -536870912
 
 def test_small_int_bit_shift_fail():
-    prim_fails(primitives.BIT_SHIFT, [4, 32])
-    prim_fails(primitives.BIT_SHIFT, [4, 31])
-    prim_fails(primitives.BIT_SHIFT, [4, 29])
-    w_result = prim(primitives.BIT_SHIFT, [4, 28])
+    prim_fails(primitives.BIT_SHIFT, [1, 33])
+    prim_fails(primitives.BIT_SHIFT, [1, 32])
+    if system.IS_64BIT:
+        w_result = prim(primitives.BIT_SHIFT, [1, 31])
+        assert isinstance(w_result, model.W_LargePositiveInteger1Word)
+        assert w_result.value == intmask(1 << 31)
+    else:
+        prim_fails(primitives.BIT_SHIFT, [1, 31])
+    
+    w_result = prim(primitives.BIT_SHIFT, [1, 30])
     assert isinstance(w_result, model.W_LargePositiveInteger1Word)
-    assert w_result.value == intmask(4 << 28)
-    w_result = prim(primitives.BIT_SHIFT, [4, 27])
+    assert w_result.value == intmask(1 << 30)
+    w_result = prim(primitives.BIT_SHIFT, [1, 29])
     assert isinstance(w_result, model.W_SmallInteger)
-    assert w_result.value == intmask(4 << 27)
+    assert w_result.value == intmask(1 << 29)
 
 def test_smallint_as_float():
     assert prim(primitives.SMALLINT_AS_FLOAT, [12]).value == 12.0

@@ -294,7 +294,7 @@ class BootstrappedObjSpace(objspace.ObjSpace):
             else:
                 return self.wrap_string(any)
         if isinstance(any, bool): return self.wrap_bool(any)
-        if isinstance(any, int): return self.wrap_int(any)
+        if isinstance(any, int) or isinstance(any, long): return self.wrap_int(any)
         if isinstance(any, float): return self.wrap_float(any)
         if isinstance(any, list): return self.wrap_list(any)
         raise Exception("Cannot wrap %r" % any)

@@ -492,6 +492,7 @@ class W_AbstractObjectWithClassReference(W_AbstractObjectWithIdentityHash):
     """Objects with arbitrary class (ie not CompiledMethod, SmallInteger or
     Float)."""
     _attrs_ = ['w_class']
+    _immutable_fields_ = ['w_class?']
     repr_classname = "W_AbstractObjectWithClassReference"
     w_class = None
 
@@ -798,6 +799,7 @@ class W_BytesObject(W_AbstractObjectWithClassReference):
                 return "<omitted>"
         return "'%s'" % self.as_string().replace('\r', '\n')
 
+    @jit.look_inside_iff(lambda self: self._size < 256)
     def as_string(self):
         if self.bytes is None:
             return "".join([self.c_bytes[i] for i in range(self.size())])
@@ -1005,7 +1007,7 @@ class W_CompiledMethod(W_AbstractObjectWithIdentityHash):
                 "bytes", "literals",
                 # Additional info about the method
                 "lookup_selector", "compiledin_class", "lookup_class" ]
-
+    _immutable_fields_ = ["version?"]
     lookup_selector = "<unknown>"
     lookup_class = None
     import_from_mixin(VersionMixin)

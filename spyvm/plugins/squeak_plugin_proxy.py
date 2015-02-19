@@ -22,8 +22,9 @@ from rpython.rlib.unroll import unrolling_iterable
 from rpython.rlib.rarithmetic import intmask, r_uint, r_uint32, r_int
 
 from spyvm import error, model, model_display, objspace, wrapper
+from spyvm.util import system
 
-sqInt = rffi.INT
+sqInt = rffi.LONG if system.IS_64BIT else rffi.INT
 sqLong = rffi.LONG
 sqDouble = rffi.DOUBLE
 sqIntArrayPtr = Ptr(rffi.CArray(sqInt))

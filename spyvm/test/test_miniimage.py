@@ -1,5 +1,6 @@
 import py, math
 from spyvm import model, constants, storage_contexts, wrapper, primitives, interpreter, error
+from spyvm.util import system
 from .util import read_image, open_reader, copy_to_module, cleanup_module, TestInterpreter, slow_test, very_slow_test
 
 pytestmark = slow_test
@@ -260,7 +261,9 @@ def test_large_positive_integer_operation_times():
     w_result = perform(w_result, "*", w_result)
     assert w_result is not None
     assert w_result.getclass(interp.space) == interp.space.w_LargePositiveInteger
-    assert w_result.unwrap_uint(interp.space) == val*val
+    if system.IS_64BIT:
+        # overflows on 32bit
+        assert w_result.unwrap_uint(interp.space) == val*val
 
 def test_doesNotUnderstand():
     w_dnu = interp.space.objtable["w_doesNotUnderstand"]

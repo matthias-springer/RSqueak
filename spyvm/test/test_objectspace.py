@@ -59,9 +59,5 @@ def test_ruint():
 
 
 def test_wrap_int():
-    for num in [-10, 1, 15, 0x3fffffff]:
+    for num in [-10, 1, 15, 0x3fffffff, 2L, -5L]:
         assert space.wrap_int(num).value == num
-
-    for num in [2L, -5L]:
-        with py.test.raises(error.WrappingError):
-            space.wrap_int(num)

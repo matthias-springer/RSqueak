@@ -72,7 +72,10 @@ def test_small_int_add():
     assert prim(primitives.ADD, [3,4]).value == 7
 
 def test_small_int_add_fail():
-    w_result = prim_fails(primitives.ADD, [constants.MAXINT, 2])
+    w_result = prim(primitives.ADD, [constants.MAXINT, 2])
+    assert isinstance(w_result, model.W_LargePositiveInteger1Word)
+    assert w_result.value == constants.MAXINT + 2
+    prim_fails(primitives.ADD, [constants.MAXINT, constants.MAXINT * 2])
 
 def test_small_int_minus():
     assert prim(primitives.SUBTRACT, [5,9]).value == -4
@@ -86,7 +89,9 @@ def test_small_int_multiply():
     assert prim(primitives.MULTIPLY, [6,3]).value == 18
 
 def test_small_int_multiply_overflow():
-    w_result = prim_fails(primitives.MULTIPLY, [constants.MAXINT, 2])
+    w_result = prim(primitives.MULTIPLY, [constants.MAXINT, 2])
+    assert isinstance(w_result, model.W_LargePositiveInteger1Word)
+    assert w_result.value == constants.MAXINT * 2
     prim_fails(primitives.MULTIPLY, [constants.MAXINT, constants.MAXINT])
     prim_fails(primitives.MULTIPLY, [constants.MAXINT, -4])
     prim_fails(primitives.MULTIPLY, [constants.MININT, constants.MAXINT])
@@ -176,7 +181,10 @@ def test_small_int_bit_shift_negative():
 def test_small_int_bit_shift_fail():
     prim_fails(primitives.BIT_SHIFT, [4, 32])
     prim_fails(primitives.BIT_SHIFT, [4, 31])
-    prim_fails(primitives.BIT_SHIFT, [4, 28])
+    prim_fails(primitives.BIT_SHIFT, [4, 29])
+    w_result = prim(primitives.BIT_SHIFT, [4, 28])
+    assert isinstance(w_result, model.W_LargePositiveInteger1Word)
+    assert w_result.value == intmask(4 << 28)
     w_result = prim(primitives.BIT_SHIFT, [4, 27])
     assert isinstance(w_result, model.W_SmallInteger)
     assert w_result.value == intmask(4 << 27)

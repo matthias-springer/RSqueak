@@ -30,7 +30,7 @@ def assert_pointers(w_obj):
 
 def check_32bit_overflow(num):
     if system.IS_64BIT:
-        # TODO find a cleaner way to handle this error?
+    # TODO find a cleaner way to handle this error?
         if num > constants.MAXINT or num < constants.MININT:
             raise PrimitiveFailedError()
 

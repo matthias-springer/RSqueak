@@ -172,6 +172,11 @@ SYSTEM_MAX_UINT = r_uint(2**64-1 if system.IS_64BIT else 2**32-1)
 SYSTEM_MAXINT = sys.maxint
 SYSTEM_MININT = -SYSTEM_MAXINT-1
 
+if system.IS_64BIT:
+    from rpython.rlib.rarithmetic import widen
+else:
+    def widen(x):
+        return x
 
 
 # Entries into SO_SPECIAL_SELECTORS_ARRAY:

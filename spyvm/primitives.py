@@ -28,11 +28,14 @@ def assert_pointers(w_obj):
         raise PrimitiveFailedError
     return w_obj
 
-def check_32bit_overflow(num):
-    if system.IS_64BIT:
-    # TODO find a cleaner way to handle this error?
-        if num > constants.MAXINT or num < constants.MININT:
+if system.IS_64BIT:
+    def check_32bit_overflow(num):
+        # TODO find a cleaner way to handle this error?
+        if num > constants.MAXINT32 or num < constants.MININT32:
             raise PrimitiveFailedError()
+else:
+    def check_32bit_overflow(num):
+        pass
 
 # ___________________________________________________________________________
 # Primitive table: it is filled in at initialization time with the

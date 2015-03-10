@@ -11,13 +11,18 @@ class o:
     viewloops = True
 conftest.option = o
 
+from rpython.rlib import jit
 from rpython.jit.metainterp.test.test_ajit import LLJitMixin
 from spyvm.test.util import import_bytecodes, read_image
 from spyvm import model, storage_contexts
+import targetrsqueak as rsqueak
 
-sys.setrecursionlimit(5000)
+sys.setrecursionlimit(10000000)
+jit.set_param(None, "trace_limit", 1000000)
+
 import_bytecodes(__name__)
-jit = LLJitMixin()
+test_jit = LLJitMixin()
+
 
 def print_result(res):
     if res is not None:
@@ -25,10 +30,10 @@ def print_result(res):
 
 # Pass a function inside here to meta-interpret it and show all encountered loops.
 def meta_interp(func):
-    return jit.meta_interp(func, [], listcomp=True, listops=True, backendopt=True, inline=True)
+    return test_jit.meta_interp(func, [], listcomp=True, listops=True, backendopt=True, inline=True)
 
-def load(imagename):
-    _, interp, _, _ = read_image(imagename)
+def load(imagename, space=None):
+    _, interp, _, _ = read_image(imagename, space=space)
     return interp
 
 # ==== The following are factories for functions to be passed into meta_interp() ====
@@ -58,43 +63,40 @@ def preload_execute_frame(imagename, bytes, literals, stack):
 # ==== The following will pre-load images and build a jit based on methods from the entry-point module
 
 def run_benchmark(imagename, benchmark, number=0, arg=""):
-    import targetimageloadingsmalltalk
     interp = load(imagename)
     def interp_run_benchmark():
-        return targetimageloadingsmalltalk._run_benchmark(interp, number, benchmark, arg)
+        return rsqueak._run_benchmark(interp, number, benchmark, arg)
     return interp_run_benchmarks
 
 def run_code(imagename, code, as_benchmark=False):
-    from targetimageloadingsmalltalk import prebuilt_space as space, \
+    from targetrsqueak import prebuilt_space as space, \
             compile_code, create_context, execute_context
-    interp = load(imagename)
+    interp = load(imagename, space=space)
+    w_receiver = space.w_nil
+    selector = compile_code(interp, w_receiver, code)
+    s_frame = create_context(interp, w_receiver, selector, None)
+    space.headless.activate()
+    context = s_frame
     def interp_run_code():
-        w_receiver = space.w_nil
-        selector = compile_code(interp, w_receiver, code)
-        s_frame = create_context(interp, w_receiver, selector, None)
-        space.headless.activate()
-        context = s_frame
         w_result = execute_context(interp, context)
         return 0
     return interp_run_code
 
 def run_image(imagename):
-    import targetimageloadingsmalltalk
     interp = load(imagename)
     def interp_run_image():
-        return targetimageloadingsmalltalk._run_image(interp)
+        return rsqueak._run_image(interp)
     return interp_run_image
 
 # ==== The following will build a JIT for the real entry-point.
 
 def full_vm(args):
-    import targetimageloadingsmalltalk
-    module_file = targetimageloadingsmalltalk.__file__[:-1]
+    module_file = rsqueak.__file__[:-1]
     full_args = [ module_file ]
     full_args.extend([ str(a) for a in args ])
     print ">> Entry Point arguments: %r" % full_args
     def interp_full_vm():
-        return targetimageloadingsmalltalk.entry_point(full_args)
+        return rsqueak.entry_point(full_args)
     return interp_full_vm
 
 def full_vm_image(imagename, additional_args = []):
@@ -118,12 +120,16 @@ def full_vm_method(imagename, selector, receiver_num=None, string_arg=None):
 def main():
     # ===== First define which image we are going to use.
     # imagename = "minibluebookdebug.image"
-    imagename = "mini.image"
-    # imagename = "Squeak4.5-noBitBlt.image"
+    # imagename = "mini.image"
+    imagename = "jittest.image"
+    # imagename = "Squeak4.5-13702.image"
 
     # ===== Define the code to be executed, if any.
     # code = "^6+7"
-    code = "10000 timesRepeat: [ 0 makeStackDepth: 10 ]"
+    # code = "10000 timesRepeat: [ 0 makeStackDepth: 10 ]"
+    # code = """ 1 to: 100000 do: [:i | (2147483647 bitXor: i) + 10 ]    """
+    # code = "10000 timesRepeat: [ (2147483647 bitXor: 12) + 10 ]"
+    code = "1 to: 10000 do: [:i | (2147483647 bitXorLarge: i) + 10 ]"
 
     # ===== These entry-points pre-load the image and directly execute a single frame.
     # func = preload_perform(imagename, model.W_SmallInteger(1000), 'loopTest2')

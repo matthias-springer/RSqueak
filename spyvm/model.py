@@ -13,16 +13,17 @@ Squeak model.
 """
 import sys
 from spyvm import constants, error
-from spyvm.util.version import constant_for_version, constant_for_version_arg, VersionMixin
+from spyvm.util.version import constant_for_version, constant_for_version_arg, VersionMixin, Version
 
 from rpython.rlib import rrandom, objectmodel, jit, signature
-from rpython.rlib.rarithmetic import intmask, r_uint, r_int
+from rpython.rlib.rarithmetic import intmask, r_uint, r_int, ovfcheck, r_longlong
 from rpython.rlib.debug import make_sure_not_resized
 from rpython.tool.pairtype import extendabletype
 from rpython.rlib.objectmodel import instantiate, compute_hash, import_from_mixin, we_are_translated
 from rpython.rtyper.lltypesystem import lltype, rffi
 from rsdl import RSDL, RSDL_helper
 from rpython.rlib.rstrategies import rstrategies as rstrat
+
 
 class W_Object(object):
     """Root of Squeak model, abstract."""
@@ -160,8 +161,26 @@ class W_Object(object):
     def rshift(self, space, shift):
         raise error.PrimitiveFailedError()
 
+    def unwrap_int(self, space):
+        raise error.UnwrappingError("Got unexpected class in unwrap_int")
+
     def unwrap_uint(self, space):
         raise error.UnwrappingError("Got unexpected class in unwrap_uint")
+
+    def unwrap_positive_32bit_int(self, space):
+        raise error.UnwrappingError("Got unexpected class unwrap_positive_32bit_int")
+
+    def unwrap_longlong(self, space):
+        raise error.UnwrappingError("Got unexpected class unwrap_longlong")
+
+    def unwrap_char(self, space):
+        raise error.UnwrappingError
+
+    def unwrap_array(self, space):
+        raise error.UnwrappingError
+
+    def unwrap_float(self, space):
+        raise error.UnwrappingError
 
     def is_array_object(self):
         return False
@@ -217,7 +236,6 @@ class W_SmallInteger(W_Object):
         return isinstance(self.value, int) and self.value < 0x8000
 
     def lshift(self, space, shift):
-        from rpython.rlib.rarithmetic import ovfcheck, intmask, r_uint
         # shift > 0, therefore the highest bit of upperbound is not set,
         # i.e. upperbound is positive
         upperbound = intmask(r_uint(-1) >> shift)
@@ -235,11 +253,25 @@ class W_SmallInteger(W_Object):
     def rshift(self, space, shift):
         return space.wrap_int(self.value >> shift)
 
+    def unwrap_int(self, space):
+        return intmask(self.value)
+
     def unwrap_uint(self, space):
-        from rpython.rlib.rarithmetic import r_uint
         val = self.value
         # Assume the caller knows what he does, even if int is negative
         return r_uint(val)
+
+    def unwrap_positive_32bit_int(self, space):
+        if self.value >= 0:
+            return r_uint(self.value)
+        else:
+            raise error.UnwrappingError
+
+    def unwrap_longlong(self, space):
+        return r_longlong(self.value)
+
+    def unwrap_float(self, space):
+        return float(self.value)
 
     def guess_classname(self):
         return "SmallInteger"
@@ -359,9 +391,23 @@ class W_LargePositiveInteger1Word(W_AbstractObjectWithIdentityHash):
         # and only in this case we do need such a mask
         return space.wrap_int((self.value >> shift) & mask)
 
+    def unwrap_int(self, space):
+        if self.value >= 0:
+            return intmask(self.value)
+        else:
+            raise error.UnwrappingError("The value is negative when interpreted as 32bit value.")
+
     def unwrap_uint(self, space):
-        from rpython.rlib.rarithmetic import r_uint
         return r_uint(self.value)
+
+    def unwrap_positive_32bit_int(self, space):
+        return r_uint(self.value)
+
+    def unwrap_longlong(self, space):
+        return r_longlong(r_uint(self.value))
+
+    def unwrap_float(self, space):
+        return float(self.value)
 
     def clone(self, space):
         return W_LargePositiveInteger1Word(self.value)
@@ -460,6 +506,9 @@ class W_Float(W_AbstractObjectWithIdentityHash):
     def clone(self, space):
         return self
 
+    def unwrap_float(self, space):
+        return self.value
+
     def at0(self, space, index0):
         return self.fetch(space, index0)
 
@@ -492,11 +541,13 @@ class W_Float(W_AbstractObjectWithIdentityHash):
     def size(self):
         return constants.WORDS_IN_FLOAT
 
+
 @signature.finishsigs
 class W_AbstractObjectWithClassReference(W_AbstractObjectWithIdentityHash):
     """Objects with arbitrary class (ie not CompiledMethod, SmallInteger or
     Float)."""
     _attrs_ = ['w_class']
+    _immutable_fields_ = ['w_class?']
     repr_classname = "W_AbstractObjectWithClassReference"
     w_class = None
 
@@ -628,9 +679,27 @@ class W_PointersObject(W_AbstractObjectWithClassReference):
                 name = " [%s]" % self._get_strategy().getname()
         return '(%s) len=%d%s' % (strategy_info, self.size(), name)
 
+    def unwrap_char(self, space):
+        w_class = self.getclass(space)
+        if not w_class.is_same_object(space.w_Character):
+            raise error.UnwrappingError("expected Character")
+        w_ord = self.fetch(space, constants.CHARACTER_VALUE_INDEX)
+        if not isinstance(w_ord, W_SmallInteger):
+            raise error.UnwrappingError("expected SmallInteger from Character")
+        return chr(w_ord.value)
+
+    @jit.look_inside_iff(lambda self, w_array: jit.isconstant(self.size()))
+    def unwrap_array(self, space):
+        # Check that our argument has pointers format and the class:
+        if not self.getclass(space).is_same_object(space.w_Array):
+            raise error.UnwrappingError
+        return [self.at0(space, i) for i in range(self.size())]
+
+    @jit.look_inside_iff(lambda self, space: jit.isconstant(self.size()))
     def fetch_all(self, space):
         return [self.fetch(space, i) for i in range(self.size())]
 
+    @jit.look_inside_iff(lambda self, space, collection: len(collection) < 64)
     def store_all(self, space, collection):
         # Be tolerant: copy over as many elements as possible, set rest to nil.
         # The size of the object cannot be changed in any case.
@@ -731,19 +800,24 @@ class W_PointersObject(W_AbstractObjectWithClassReference):
         return w_result
 
 class W_BytesObject(W_AbstractObjectWithClassReference):
-    _attrs_ = ['bytes', '_size']
+    _attrs_ = ['version', 'bytes', '_size', 'c_bytes']
     repr_classname = 'W_BytesObject'
     bytes_per_slot = 1
-    _immutable_fields_ = ['bytes?', '_size?']
+    _immutable_fields_ = ['version?', 'bytes?', '_size?', 'c_bytes?']
 
     def __init__(self, space, w_class, size):
         W_AbstractObjectWithClassReference.__init__(self, space, w_class)
         assert isinstance(size, int)
+        self.mutate()
         self.bytes = ['\x00'] * size
         self._size = size
 
+    def mutate(self):
+        self.version = Version()
+
     def fillin(self, space, g_self):
         W_AbstractObjectWithClassReference.fillin(self, space, g_self)
+        self.mutate()
         self.bytes = g_self.get_bytes()
         self._size = len(self.bytes)
 
@@ -754,11 +828,20 @@ class W_BytesObject(W_AbstractObjectWithClassReference):
         self.setchar(index0, chr(space.unwrap_int(w_value)))
 
     def getchar(self, n0):
-        return self.bytes[n0]
+        if self.bytes is None:
+            if n0 >= self._size:
+                raise IndexError
+            return self.c_bytes[n0]
+        else:
+            return self.bytes[n0]
 
     def setchar(self, n0, character):
         assert len(character) == 1
-        self.bytes[n0] = character
+        if self.bytes is None:
+            self.c_bytes[n0] = character
+        else:
+            self.bytes[n0] = character
+        self.mutate()
 
     def short_at0(self, space, index0):
         byte_index0 = index0 * 2
@@ -789,8 +872,14 @@ class W_BytesObject(W_AbstractObjectWithClassReference):
         return "'%s'" % self.as_string().replace('\r', '\n')
 
     def as_string(self):
-        string = "".join(self.bytes)
-        return string
+        return self._pure_as_string(self.version)
+
+    @jit.elidable
+    def _pure_as_string(self, version):
+        if self.bytes is None:
+            return "".join([self.c_bytes[i] for i in range(self.size())])
+        else:
+            return "".join(self.bytes)
 
     def selector_string(self):
         return "#" + self.as_string()
@@ -817,7 +906,7 @@ class W_BytesObject(W_AbstractObjectWithClassReference):
         else:
             return self.has_same_chars(other, size)
 
-    @jit.look_inside_iff(lambda self, other, size: size < 256)
+    @jit.look_inside_iff(lambda self, other, size: jit.isconstant(size))
     def has_same_chars(self, other, size):
         for i in range(size):
             if self.getchar(i) != other.getchar(i):
@@ -827,17 +916,36 @@ class W_BytesObject(W_AbstractObjectWithClassReference):
     def clone(self, space):
         size = self.size()
         w_result = W_BytesObject(space, self.getclass(space), size)
-        w_result.bytes = list(self.bytes)
+        if self.bytes is None:
+            w_result.bytes = [self.c_bytes[i] for i in range(size)]
+        else:
+            w_result.bytes = list(self.bytes)
         return w_result
 
+    @jit.unroll_safe
     def unwrap_uint(self, space):
         # TODO: Completely untested! This failed translation bigtime...
         # XXX Probably we want to allow all subclasses
         if not self.getclass(space).is_same_object(space.w_LargePositiveInteger):
             raise error.UnwrappingError("Failed to convert bytes to word")
-        word = 0
+        if self.size() > 4:
+            raise error.UnwrappingError("Too large to convert bytes to word")
+        word = r_uint(0)
         for i in range(self.size()):
             word += r_uint(ord(self.getchar(i))) << 8*i
+        return word
+
+    @jit.unroll_safe
+    def unwrap_longlong(self, space):
+        # TODO: Completely untested! This failed translation bigtime...
+        # XXX Probably we want to allow all subclasses
+        if not self.getclass(space).is_same_object(space.w_LargePositiveInteger):
+            raise error.UnwrappingError("Failed to convert bytes to word")
+        if self.size() > 8:
+            raise error.UnwrappingError("Too large to convert bytes to word")
+        word = r_longlong(0)
+        for i in range(self.size()):
+            word += r_longlong(ord(self.getchar(i))) << 8*i
         return word
 
     def is_array_object(self):
@@ -846,14 +954,30 @@ class W_BytesObject(W_AbstractObjectWithClassReference):
     def _become(self, w_other):
         assert isinstance(w_other, W_BytesObject)
         self.bytes, w_other.bytes = w_other.bytes, self.bytes
+        self.c_bytes, w_other.c_bytes = w_other.c_bytes, self.c_bytes
         self._size, w_other._size = w_other._size, self._size
+        self.mutate()
         W_AbstractObjectWithClassReference._become(self, w_other)
+
+    def convert_to_c_layout(self):
+        if self.bytes is None:
+            return self.c_bytes
+        else:
+            size = self.size()
+            c_bytes = self.c_bytes = rffi.str2charp(self.as_string())
+            self.bytes = None
+            self.mutate()
+            return c_bytes
+
+    def __del__(self):
+        if self.bytes is None:
+            rffi.free_charp(self.c_bytes)
 
 
 class W_WordsObject(W_AbstractObjectWithClassReference):
-    _attrs_ = ['words', '_size']
+    _attrs_ = ['words', '_size', 'c_words']
     repr_classname = "W_WordsObject"
-    _immutable_fields_ = ['words?', 'size?']
+    _immutable_fields_ = ['words?', 'size?', 'c_words?']
 
     def __init__(self, space, w_class, size):
         W_AbstractObjectWithClassReference.__init__(self, space, w_class)
@@ -875,10 +999,16 @@ class W_WordsObject(W_AbstractObjectWithClassReference):
 
     def getword(self, n):
         assert self.size() > n >= 0
-        return self.words[n]
+        if self.words is None:
+            return r_uint(self.c_words[n])
+        else:
+            return self.words[n]
 
     def setword(self, n, word):
-        self.words[n] = r_uint(word)
+        if self.words is None:
+            self.c_words[n] = intmask(word)
+        else:
+            self.words[n] = r_uint(word)
 
     def short_at0(self, space, index0):
         word = intmask(self.getword(index0 / 2))
@@ -914,7 +1044,10 @@ class W_WordsObject(W_AbstractObjectWithClassReference):
     def clone(self, space):
         size = self.size()
         w_result = W_WordsObject(space, self.getclass(space), size)
-        w_result.words = list(self.words)
+        if self.words is None:
+            w_result.words = [r_uint(self.c_words[i]) for i in range(size)]
+        else:
+            w_result.words = list(self.words)
         return w_result
 
     def is_array_object(self):
@@ -923,8 +1056,26 @@ class W_WordsObject(W_AbstractObjectWithClassReference):
     def _become(self, w_other):
         assert isinstance(w_other, W_WordsObject)
         self.words, w_other.words = w_other.words, self.words
+        self.c_words, w_other.c_words = w_other.c_words, self.c_words
         self._size, w_other._size = w_other._size, self._size
         W_AbstractObjectWithClassReference._become(self, w_other)
+
+    def convert_to_c_layout(self):
+        if self.words is None:
+            return self.c_words
+        else:
+            size = self.size()
+            old_words = self.words
+            from spyvm.plugins.squeak_plugin_proxy import sqIntArrayPtr
+            c_words = self.c_words = lltype.malloc(sqIntArrayPtr.TO, size, flavor='raw')
+            for i in range(size):
+                c_words[i] = intmask(old_words[i])
+            self.words = None
+            return c_words
+
+    def __del__(self):
+        if self.words is None:
+            lltype.free(self.c_words, flavor='raw')
 
 
 class W_CompiledMethod(W_AbstractObjectWithIdentityHash):
@@ -948,7 +1099,7 @@ class W_CompiledMethod(W_AbstractObjectWithIdentityHash):
                 "bytes", "literals",
                 # Additional info about the method
                 "lookup_selector", "compiledin_class", "lookup_class" ]
-
+    _immutable_fields_ = ["version?"]
     lookup_selector = "<unknown>"
     lookup_class = None
     import_from_mixin(VersionMixin)

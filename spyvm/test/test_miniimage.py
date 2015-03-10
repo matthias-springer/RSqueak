@@ -204,7 +204,7 @@ def test_map_mirrors_to_classtable():
 
 @very_slow_test
 def test_runimage_and_quit():
-    from targetimageloadingsmalltalk import active_context, execute_context
+    from targetrsqueak import active_context, execute_context
     space, interp = runningExitImage(cached=False)
     frame = active_context(space)
     try:
@@ -248,12 +248,13 @@ def test_existing_large_positive_integer_as_W_LargePositiveInteger1Word():
     assert isinstance(w_result, model.W_Float)
     assert w_result.value == math.pi
 
-def test_large_positive_integer_operations():
+def test_large_positive_integer_operation_add():
     w_result = perform(interp.space.w_SmallInteger, "maxVal")
     w_result = perform(w_result, "+", interp.space.wrap_int(2 * interp.space.unwrap_int(w_result)))
     assert w_result is not None
     assert isinstance(w_result, model.W_LargePositiveInteger1Word)
 
+def test_large_positive_integer_operation_times():
     w_result = perform(interp.space.w_SmallInteger, "maxVal")
     w_result = perform(w_result, "*", w_result)
     assert w_result is not None
